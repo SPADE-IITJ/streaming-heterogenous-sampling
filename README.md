@@ -1,3 +1,3 @@
 # streaming-heterogenous-sampling
 
-Programs corresponding to the work "Efficient Parallel Algorithms for Dynamic Percolation Centrality"
+Programs corresponding to the work "SMaSH: Streaming MST with Sampling on Heterogeneous Systems".
