@@ -22,7 +22,7 @@ struct UpdateEdge {
 class PDS_Algorithm {
 private:
     vtx_t V;
-    MSF_MembershipMap membership_map;  // O(1) expected-time membership queries
+    MSF_MembershipMap membership_map;  
     link_cut_tree lct;
     vector<bitmap_t> h_MultiFilter;
     vector<weight_t> h_weights;
