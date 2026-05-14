@@ -37,13 +37,17 @@ $(EXEC_DIR)/fresh_cpu: $(CPU_DIR)/fresh_main.cpp $(CPU_KERNELS) $(UTILS_SRCS)
 	$(CXX) $(CXXFLAGS) -DFRESH_MAIN -o $@ $(CPU_DIR)/fresh_main.cpp $(CPU_KERNELS) -lm $(PTHREAD_LIB)
 	@echo "✓ FRESH (CPU) executable created: $@"
 
-$(BUILD_DIR)/kernels.o: $(GPU_DIR)/kernels.cu $(INCLUDE_DIR)/utils.hpp $(INCLUDE_DIR)/filters.hpp
-	@echo "Compiling GPU kernels..."
-	$(NVCC) $(NVCCFLAGS) -c -o $@ $<
+$(BUILD_DIR)/fresh_main.o: $(CPU_DIR)/fresh_main.cpp $(INCLUDE_DEPS)
+	@echo "Compiling FRESH (CPU side)..."
+	$(CXX) $(CXXFLAGS) -I./include -DFRESH_MAIN -c -o $@ $<
 
-$(EXEC_DIR)/fresh_gpu: $(BUILD_DIR)/kernels.o $(CPU_DIR)/fresh_main.cpp $(UTILS_SRCS)
-	@echo "Building FRESH (GPU-enabled)..."
-	$(NVCC) $(NVCCFLAGS) -I./include -DFRESH_MAIN -o $@ $(BUILD_DIR)/kernels.o $(CPU_DIR)/fresh_main.cpp $(CUDA_LIBS)
+$(BUILD_DIR)/kernels.o: $(GPU_DIR)/kernels.cu $(INCLUDE_DEPS)
+	@echo "Compiling GPU kernels..."
+	$(NVCC) $(NVCCFLAGS) -I./include -c -o $@ $<
+
+$(EXEC_DIR)/fresh_gpu: $(BUILD_DIR)/fresh_main.o $(BUILD_DIR)/kernels.o
+	@echo "Linking FRESH (GPU-enabled)..."
+	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(CUDA_LIBS) $(PTHREAD_LIB)
 	@echo "✓ FRESH (GPU) executable created: $@"
 
 pds_cpu: $(EXEC_DIR)/pds_cpu
