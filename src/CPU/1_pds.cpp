@@ -8,10 +8,11 @@
 #include <set>
 
 enum UpdateOp {
-    AUG,  // add edge 
-    PRU,  // remove edge 
-    MUT   // mutate edge
+    AUG,  // add
+    PRU,  // remove
+    MUT   // mutate
 };
+
 
 struct UpdateEdge {
     vtx_t u, v;
@@ -82,7 +83,7 @@ public:
         if (in_mst) {
             lct.cut(u);
             
-            // TODO: FindReplacementEdge(L, G, E, T, δ)
+            // TODO: FINDREPLACEMENTEDGE(L, G, E, T, δ)
         }
     }
 
@@ -141,13 +142,15 @@ private:
 };
 
 int smash_pds(int argc, char* argv[]) {
+    cout << "\n=== SMAsh-PDS: Primitive-based Dynamic MST ===" << endl;
+
     int V = 0;
     set<vtx_t> vertices;
     vector<Edge> all_edges = read_graph_from_file(FILENAME, V, vertices);
     int E = all_edges.size();
     
     if (V == 0 || E == 0) {
-        cout << "EMPTY GRAPH / EXITING" << endl;
+        cout << "Graph is empty or has no vertices. Exiting." << endl;
         return 0;
     }
 
@@ -187,7 +190,6 @@ int smash_pds(int argc, char* argv[]) {
                           num_words * sizeof(bitmap_t), 
                           cudaMemcpyDeviceToHost));
 
-    
     PDS_Algorithm pds(V, h_MultiFilter, h_weights);
 
     stream updates(UPDATES_FILENAME);
@@ -213,6 +215,12 @@ int smash_pds(int argc, char* argv[]) {
     cudaFree(csr.d_weights);
     cudaFree(csr.d_self_ptr);
 #endif
+
+    // results
+    cout << "\nSMASH-PDS" << endl;
+    cout << "PROCESSED " << update_count << " UPDATES IN " << duration_updates << " ms" << endl;
+    cout << "AVG/UPDATE:  " << (duration_updates / update_count) * 1000 << " μs" << endl;
+    cout << "GRAPH: G(V=" << V << ", E=" << E << ")" << endl;
 
     return 0;
 }

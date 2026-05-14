@@ -52,7 +52,7 @@ using stream = std::ifstream;
     } \
 }
 #else
-#define CHECK_CUDA(call) { }  // No-op for CPU-only builds
+#define CHECK_CUDA(call) { }  
 #endif
 
 #ifdef CUDA_AVAILABLE
@@ -84,7 +84,7 @@ struct CanonicalEdge {
     
     CanonicalEdge() : u(-1), v(-1) {}
     CanonicalEdge(vtx_t u_, vtx_t v_) {
-        if (u_ == v_) { u = -1; v = -1; return; } // No self-loops
+        if (u_ == v_) { u = -1; v = -1; return; } 
         if (u_ < v_) { u = u_; v = v_; }
         else { u = v_; v = u_; }
     }
@@ -98,8 +98,7 @@ struct CanonicalEdge {
 
 struct CanonicalEdgeHash {
     size_t operator()(const CanonicalEdge& e) const {
-        // Cantor pairing: hash = (u + v) * (u + v + 1) / 2 + v
-        // Combined with vertex count for extra collision resistance
+        // hash = (u + v) * (u + v + 1) / 2 + v
         size_t a = (size_t)e.u;
         size_t b = (size_t)e.v;
         return (a + b) * (a + b + 1) / 2 + b;
@@ -113,10 +112,8 @@ struct Edge {
 
 class MSF_MembershipMap {
 private:
-    // Hash map storing MSF edges with their weights
     unordered_map<CanonicalEdge, weight_t, CanonicalEdgeHash> mst_edges;
     
-    // Adjacency list for degree-based queries (optional, for fast incident edge queries)
     unordered_map<vtx_t, set<vtx_t>> adjacency;
 
 public:
@@ -124,12 +121,11 @@ public:
     
     bool insert(vtx_t u, vtx_t v, weight_t w) {
         CanonicalEdge ce(u, v);
-        if (!ce.is_valid()) return false; // Self-loop, invalid
+        if (!ce.is_valid()) return false; 
         
         auto [it, inserted] = mst_edges.insert({ce, w});
         
         if (inserted) {
-            // Update adjacency list
             adjacency[ce.u].insert(ce.v);
             adjacency[ce.v].insert(ce.u);
         }
@@ -142,15 +138,13 @@ public:
         if (!ce.is_valid()) return false;
         
         auto it = mst_edges.find(ce);
-        if (it == mst_edges.end()) return false; // Edge not in MSF
+        if (it == mst_edges.end()) return false; 
         
         mst_edges.erase(it);
         
-        // Update adjacency list
         adjacency[ce.u].erase(ce.v);
         adjacency[ce.v].erase(ce.u);
         
-        // Clean up empty entries
         if (adjacency[ce.u].empty()) adjacency.erase(ce.u);
         if (adjacency[ce.v].empty()) adjacency.erase(ce.v);
         
@@ -210,12 +204,17 @@ public:
 struct CSR {
     vtx_t num_vertices;
     long long num_total_possible_edges;
-    weight_t* d_weights; // A flattened V*(V-1)/2 array
-    CSR* d_self_ptr; // Pointer to this struct on the device
+    weight_t* d_weights; 
+    CSR* d_self_ptr; 
 };
 
 struct DSU {
     vtx_t* d_parent;
+};
+
+struct GPU_Boruvka_Result {
+    CSR adj_matrix;
+    vector<Edge> mst_edges;
 };
 
 #define NOW std::chrono::high_resolution_clock::now()
@@ -229,9 +228,8 @@ HOST_DEVICE inline void device_aware_swap(vtx_t& a, vtx_t& b) {
 }
 
 HOST_DEVICE inline long long get_edge_index(vtx_t u, vtx_t v, vtx_t V) {
-    if (u == v) return -1; // No self-loops
+    if (u == v) return -1; 
     if (u > v) device_aware_swap(u, v);
-    // Formula for upper triangle mapping: sum of lengths of rows 0 to u-1, plus offset in row u
     return (long long)u * (2LL * V - (long long)u - 1) / 2 + v - u - 1;
 }
 
@@ -259,6 +257,7 @@ inline vector<Edge> read_graph_from_file(const string& file_path, int& num_verti
 
 #ifdef CUDA_AVAILABLE
 
+#ifdef __CUDACC__
 GLOBAL void initialize_matrix_kernel(weight_t* d_weights, long long size) {
     long long idx = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
@@ -276,6 +275,10 @@ GLOBAL void populate_matrix_kernel(Edge* d_edges, int E, vtx_t V, weight_t* d_we
         d_weights[edge_idx] = edge.w;
     }
 }
+#else
+GLOBAL void initialize_matrix_kernel(weight_t* d_weights, long long size);
+GLOBAL void populate_matrix_kernel(Edge* d_edges, int E, vtx_t V, weight_t* d_weights);
+#endif
 
 inline CSR create_adj_matrix_on_gpu(const vector<Edge>& edges, vtx_t V, vtx_t E) {
     CSR adj_matrix;

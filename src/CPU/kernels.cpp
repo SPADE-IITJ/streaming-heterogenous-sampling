@@ -1,6 +1,5 @@
 #include "../../include/utils.hpp"
 
-
 #ifndef CUDA_AVAILABLE
 
 extern vector<Edge> read_graph_from_file(const string& filename, int& V, std::set<vtx_t>& vertices);
@@ -36,11 +35,24 @@ vector<Edge> run_parallel_boruvka(CSR& adj_matrix) {
         if (root_u != root_v) {
             parent[root_v] = root_u;
             result.push_back(edge);
-            if ((int)result.size() == V - 1) break;  // MST complete
+            if ((int)result.size() == V - 1) break; 
         }
     }
     
     cout << "MST constructed: " << result.size() << " edges" << endl;
+    return result;
+}
+
+GPU_Boruvka_Result run_parallel_boruvka_gpu_wrapper(const vector<Edge>& edges, vtx_t V) {
+    CSR csr;
+    csr.num_vertices = V;
+    csr.num_total_possible_edges = (long long)V * (V - 1) / 2;
+    csr.d_weights = nullptr;
+    csr.d_self_ptr = nullptr;
+    
+    GPU_Boruvka_Result result;
+    result.adj_matrix = csr;
+    result.mst_edges = run_parallel_boruvka(csr);
     return result;
 }
 

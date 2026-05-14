@@ -20,5 +20,6 @@ __global__ void add_cheapest_edges_kernel(DSU* d_dsu, vtx_t V,
 #endif  // CUDA_AVAILABLE
 
 vector<Edge> run_parallel_boruvka(CSR& adj_matrix);
+GPU_Boruvka_Result run_parallel_boruvka_gpu_wrapper(const vector<Edge>& edges, vtx_t V);
 
 #endif // GPU_KERNELS_HPP

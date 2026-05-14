@@ -134,12 +134,20 @@ vector<Edge> run_parallel_boruvka(CSR& adj_matrix) {
     vector<vtx_t> host_dsu_parent(V);
     std::iota(host_dsu_parent.begin(), host_dsu_parent.end(), 0);
 
-    auto find_set_host = [&](vtx_t i) -> vtx_t {
-        if (host_dsu_parent[i] == i) return i;
-        return host_dsu_parent[i] = find_set_host(host_dsu_parent[i]);
+    auto find_set_host = [&host_dsu_parent](vtx_t i) -> vtx_t {
+        vtx_t root = i;
+        while (host_dsu_parent[root] != root) {
+            root = host_dsu_parent[root];
+        }
+        while (host_dsu_parent[i] != root) {
+            vtx_t next = host_dsu_parent[i];
+            host_dsu_parent[i] = root;
+            i = next;
+        }
+        return root;
     };
     
-    auto unite_sets_host = [&](vtx_t i, vtx_t j) {
+    auto unite_sets_host = [&find_set_host, &host_dsu_parent](vtx_t i, vtx_t j) {
         vtx_t root_i = find_set_host(i);
         vtx_t root_j = find_set_host(j);
         if (root_i != root_j) host_dsu_parent[root_i] = root_j;
@@ -159,4 +167,13 @@ vector<Edge> run_parallel_boruvka(CSR& adj_matrix) {
 
     cout << "Boruvka's algorithm finished. Found " << final_mst.size() << " MST edges." << endl;
     return final_mst;
+}
+
+GPU_Boruvka_Result run_parallel_boruvka_gpu_wrapper(const vector<Edge>& edges, vtx_t V) {
+    CSR adj_matrix = create_adj_matrix_on_gpu(edges, V, edges.size());
+    vector<Edge> mst_edges = run_parallel_boruvka(adj_matrix);
+    GPU_Boruvka_Result result;
+    result.adj_matrix = adj_matrix;
+    result.mst_edges = mst_edges;
+    return result;
 }

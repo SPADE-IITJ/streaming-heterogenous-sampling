@@ -11,13 +11,13 @@
 class RES_Algorithm {
 private:
     vtx_t V;
-    MSF_MembershipMap membership_map; 
+    MSF_MembershipMap membership_map;  
     link_cut_tree lct;
     vector<bitmap_t> h_MultiFilter;
     vector<weight_t> h_weights;
     
-    UpdationReservoir R_U; 
-    int B_max;             
+    UpdationReservoir R_U;  
+    int B_max;              
     int tau_ms;             
     std::chrono::high_resolution_clock::time_point timer_start;
 
@@ -33,7 +33,7 @@ public:
           B_max(batch_size), tau_ms(time_threshold) {
         timer_start = NOW;
     }
-    
+
     MSF_MembershipMap& get_membership_map() {
         return membership_map;
     }
@@ -53,7 +53,9 @@ public:
         return size_trigger || time_trigger;
     }
 
-    void process_batch() {        
+    void process_batch() {
+        cout << "Processing batch of " << R_U.size() << " updates..." << endl;
+        
         vector<Edge> batch_edges;
         for (const auto& [edge_key, weight] : R_U) {
             batch_edges.push_back({std::get<0>(edge_key), std::get<1>(edge_key), weight});
@@ -76,8 +78,6 @@ public:
             
             if (membership_map.contains(u, v)) {
                 weight_t mst_w = membership_map.get_weight(u, v);
-                if (w < mst_w) {
-                }
             } else {
                 bool changed;
                 Edge removed_edge;
@@ -114,6 +114,7 @@ public:
 
     void flush() {
         if (!R_U.empty()) {
+            cout << "Flushing final batch of " << R_U.size() << " updates" << endl;
             process_batch();
         }
     }
@@ -124,13 +125,15 @@ public:
 };
 
 int smash_res(int argc, char* argv[]) {
+    cout << "\n=== SMAsh-RES: Reservoir-based Dynamic MST ===" << endl;
+
     int V = 0;
     set<vtx_t> vertices;
     vector<Edge> all_edges = read_graph_from_file(FILENAME, V, vertices);
     int E = all_edges.size();
     
     if (V == 0 || E == 0) {
-        cout << "EMPTY GRAPH / EXITING" << endl;
+        cout << "Graph is empty or has no vertices. Exiting." << endl;
         return 0;
     }
 
@@ -170,9 +173,10 @@ int smash_res(int argc, char* argv[]) {
                           num_words * sizeof(bitmap_t), 
                           cudaMemcpyDeviceToHost));
 
+    cout << "\n--- Processing Updates (RES with Batching) ---" << endl;
     
-    int B_max = 100;      // set
-    int tau_ms = 50;      // set
+    int B_max = 100;      
+    int tau_ms = 50;      
     RES_Algorithm res(V, h_MultiFilter, h_weights, B_max, tau_ms);
 
     stream updates(UPDATES_FILENAME);
@@ -198,6 +202,13 @@ int smash_res(int argc, char* argv[]) {
     cudaFree(csr.d_weights);
     cudaFree(csr.d_self_ptr);
 #endif
+
+    // Print timing results
+    cout << "\nSMASH-RES" << endl;
+    cout << "PROCESSED " << update_count << " UPDATES IN " << duration_updates << " ms" << endl;
+    cout << "AVG/UPDATE:  " << (duration_updates / update_count) * 1000 << " μs" << endl;
+    cout << "BATCH SIZE:      " << B_max << " | TIME THRESHOLD: " << tau_ms << " ms" << endl;
+    cout << "GRAPH: G(V=" << V << ", E=" << E << ")" << endl;
 
     return 0;
 }

@@ -31,11 +31,12 @@ struct ReservoirGraph {
     }
 };
 
+
 class FRESH_Algorithm {
-private
+private:
     vtx_t V_main;
     MSF_MembershipMap membership_map_main;      
-    MSF_MembershipMap membership_map_reservoir;  
+    MSF_MembershipMap membership_map_reservoir; 
     link_cut_tree lct_main;
     vector<bitmap_t> h_MultiFilter;
     vector<weight_t> h_weights;
@@ -57,7 +58,7 @@ public:
     ~FRESH_Algorithm() {
         if (reservoir.lct) delete reservoir.lct;
     }
-
+    
     MSF_MembershipMap& get_main_membership_map() {
         return membership_map_main;
     }
@@ -122,7 +123,6 @@ public:
             update_main_filter(u, v, multi_filter::IN_MST);
         }
     }
-
 
     void case3__both_in_reservoir(vtx_t u, vtx_t v, weight_t w) {        
         if (u > v) std::swap(u, v);
@@ -206,26 +206,28 @@ private:
     }
 };
 
-int smash_fresh(int argc, char* argv[]) {
+int main_fresh(int argc, char* argv[]) {
+    cout << "\nSMASH-FRESH" << endl;
+
     int V = 0;
     set<vtx_t> vertices;
     vector<Edge> all_edges = read_graph_from_file(FILENAME, V, vertices);
     int E = all_edges.size();
     
     if (V == 0 || E == 0) {
-        cout << "EMPTY GRAPH / EXITING" << endl;
+        cout << "Graph is empty or has no vertices. Exiting." << endl;
         return 0;
     }
 
     auto start = NOW;
     
-    CSR csr = create_adj_matrix_on_gpu(all_edges, V, E);
+    GPU_Boruvka_Result gpu_result = run_parallel_boruvka_gpu_wrapper(all_edges, V);
+    CSR csr = gpu_result.adj_matrix;
+    vector<Edge> mst_edges = gpu_result.mst_edges;
     auto end = NOW;
     auto duration_matrix = NANOSECONDS(end - start).count() / 1e6;
 
     start = NOW;
-    
-    vector<Edge> mst_edges = run_parallel_boruvka(csr);
     end = NOW;
     auto duration_boruvka = NANOSECONDS(end - start).count() / 1e6;
 
@@ -253,6 +255,7 @@ int smash_fresh(int argc, char* argv[]) {
                           num_words * sizeof(bitmap_t), 
                           cudaMemcpyDeviceToHost));
 
+    
     FRESH_Algorithm fresh(V, h_MultiFilter, h_weights, vertices);
 
     stream updates(UPDATES_FILENAME);
@@ -276,11 +279,18 @@ int smash_fresh(int argc, char* argv[]) {
     cudaFree(csr.d_weights);
     cudaFree(csr.d_self_ptr);
 #endif
+
+    cout << "\nSMASH-FRESH" << endl;
+    cout << "PROCESSED " << update_count << " UPDATES " << duration_updates << " ms" << endl;
+    cout << "AVG/UPDATE:  " << (duration_updates / update_count) * 1000 << " μs" << endl;
+    cout << "GRAPH: G(V=" << V << ", E=" << E << ")" << endl;
+
     return 0;
 }
 
+// Add this to enable standalone compilation
 #ifdef FRESH_MAIN
 int main(int argc, char* argv[]) {
-    return smash_fresh(argc, argv);
+    return main_fresh(argc, argv);
 }
 #endif
