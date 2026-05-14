@@ -34,14 +34,12 @@ __global__ void find_cheapest_edges_kernel(CSR* d_csr, DSU* d_dsu,
     vtx_t my_component = find_set_atomic(d_dsu, u);
     vtx_t V = d_csr->num_vertices;
 
-    // O(V) neighbor iteration for the triangular adjacency matrix
     for (vtx_t v = 0; v < V; ++v) {
         if (u == v) continue;
 
         long long edge_idx = get_edge_index(u, v, V);
         weight_t weight = d_csr->d_weights[edge_idx];
 
-        // Check if edge exists and connects to different component
         if (weight != NO_EDGE_SENTINEL) {
             if (my_component != find_set_atomic(d_dsu, v)) {
                 if (weight < min_weight || (weight == min_weight && v < min_edge_neighbor)) {
